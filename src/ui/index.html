@@ -1391,37 +1391,63 @@
     }
 
     async function loadRecentZCodeSessions() {
-      recentSessionsList.innerHTML = '<div style="font-size:11px; color:var(--text-muted); padding:8px;">加载中...</div>';
+      recentSessionsList.replaceChildren();
+      const loadingDiv = document.createElement('div');
+      loadingDiv.style.cssText = 'font-size:11px; color:var(--text-muted); padding:8px;';
+      loadingDiv.textContent = '加载中...';
+      recentSessionsList.appendChild(loadingDiv);
+
       try {
         const res = await fetch('/api/recent-zcode-sessions');
         if (!res.ok) throw new Error('拉取失败');
         const data = await res.json();
         const sessions = data.sessions || [];
 
+        recentSessionsList.replaceChildren();
+
         if (sessions.length === 0) {
-          recentSessionsList.innerHTML = '<div style="font-size:11px; color:var(--text-muted); padding:8px;">暂无本地 ZCode 会话记录</div>';
+          const emptyDiv = document.createElement('div');
+          emptyDiv.style.cssText = 'font-size:11px; color:var(--text-muted); padding:8px;';
+          emptyDiv.textContent = '暂无本地会话记录';
+          recentSessionsList.appendChild(emptyDiv);
           return;
         }
 
-        recentSessionsList.innerHTML = '';
         sessions.forEach(sess => {
           const item = document.createElement('div');
           item.className = 'session-item';
-          const dirName = sess.directory.split('/').pop() || '根目录';
-          item.innerHTML = `
-            <div class="session-title">${sess.title || '未命名会话'}</div>
-            <div class="session-meta">
-              <span>📁 ${dirName}</span>
-              <span>${sess.id.slice(0, 16)}...</span>
-            </div>
-          `;
+
+          const titleEl = document.createElement('div');
+          titleEl.className = 'session-title';
+          titleEl.textContent = sess.title || '未命名会话';
+
+          const metaEl = document.createElement('div');
+          metaEl.className = 'session-meta';
+
+          const dirName = (sess.directory || '').split('/').pop() || '根目录';
+          const dirSpan = document.createElement('span');
+          dirSpan.textContent = `📁 ${dirName}`;
+
+          const idSpan = document.createElement('span');
+          idSpan.textContent = `${(sess.id || '').slice(0, 16)}...`;
+
+          metaEl.appendChild(dirSpan);
+          metaEl.appendChild(idSpan);
+
+          item.appendChild(titleEl);
+          item.appendChild(metaEl);
+
           item.onclick = () => {
             selectSession(sess.id, sess.title, sess.directory);
           };
           recentSessionsList.appendChild(item);
         });
       } catch (err) {
-        recentSessionsList.innerHTML = `<div style="font-size:11px; color:var(--warning); padding:8px;">加载会话失败: ${err.message}</div>`;
+        recentSessionsList.replaceChildren();
+        const errDiv = document.createElement('div');
+        errDiv.style.cssText = 'font-size:11px; color:var(--warning); padding:8px;';
+        errDiv.textContent = `加载会话失败: ${err.message}`;
+        recentSessionsList.appendChild(errDiv);
       }
     }
 

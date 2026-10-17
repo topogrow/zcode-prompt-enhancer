@@ -6,15 +6,13 @@ class MainWindow: NSWindow {
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            // 包含 .miniaturizable 支持原生最小化，.titled 与 .resizable 支持拖拽缩放
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        // 默认层级为普通应用窗口 (.normal)，取消强制全局置顶，使其能够正常参与 macOS 调度中心平铺缩放
+        // 普通窗口层级，取消强制全局置顶，正常参与调度中心 (Mission Control) 平铺
         self.level = .normal
         self.hidesOnDeactivate = false
-        // 关键：允许参与窗口周期循环与调度中心平铺管理
         self.collectionBehavior = [.managed, .participatesInCycle, .fullScreenPrimary]
         
         self.titleVisibility = .hidden
@@ -24,10 +22,10 @@ class MainWindow: NSWindow {
         self.backgroundColor = .clear
         self.hasShadow = true
         
-        // 限制窗口最小尺寸放宽至 260px，支持更窄侧边栏形态
+        // 最小尺寸放宽至 260px
         self.minSize = NSSize(width: 260, height: 280)
         
-        // 隐藏原生不可控标题栏按钮，由前端顶栏标准的“红黄绿”三点按钮接管精准触发
+        // 隐藏原生左上角控制按钮，由顶栏统一样式接管
         self.standardWindowButton(.closeButton)?.isHidden = true
         self.standardWindowButton(.miniaturizeButton)?.isHidden = true
         self.standardWindowButton(.zoomButton)?.isHidden = true
@@ -42,13 +40,14 @@ class MainWindow: NSWindow {
     }
 }
 
-// 探测 ZCode 窗口坐标与尺寸
+// 探测目标工作区 (如 ZCode) 窗口坐标与尺寸
 func getZCodeWindowFrame() -> NSRect? {
     let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
     let primaryScreenHeight = NSScreen.screens.first?.frame.height ?? 900
 
     for win in windowList {
-        guard let owner = win[kCGWindowOwnerName as String] as? String, owner == "ZCode",
+        guard let owner = win[kCGWindowOwnerName as String] as? String,
+              owner == "ZCode" || owner == "Cursor" || owner == "Code",
               let bounds = win[kCGWindowBounds as String] as? [String: Any],
               let x = bounds["X"] as? CGFloat,
               let y = bounds["Y"] as? CGFloat,
@@ -74,7 +73,7 @@ class ScriptBridge: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let panel = self.panel else { return }
         
-        // 1. 窗口原生平滑拖拽
+        // 1. 窗口原生平滑拖动
         if message.name == "startWindowDrag" {
             if let currentEvent = NSApp.currentEvent {
                 panel.performDrag(with: currentEvent)
@@ -95,7 +94,7 @@ class ScriptBridge: NSObject, WKScriptMessageHandler {
             }
         }
         
-        // 4. macOS 标准三点窗口控制
+        // 4. 标准三点窗口控制
         if message.name == "closeWindow" {
             panel.orderOut(nil)
         }
@@ -123,25 +122,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var dockTrackingTimer: Timer?
     var serverProcess: Process?
     
+    // 磁贴跟随降频状态变量
+    private var lastTargetFrame: NSRect? = nil
+    private var staticTickCount: Int = 0
+    private var isHighRate: Bool = true
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
         
-        // 1. 注入标准 macOS 应用程序菜单 (关键：激活 Cmd+C / Cmd+V / Cmd+X / Cmd+A / Cmd+Z)
+        // 1. 注入标准 macOS 应用程序菜单 (激活 Cmd+C / Cmd+V / Cmd+X / Cmd+A / Cmd+Z)
         setupMainMenu()
         
         // 2. 自管理拉起内置本地 Node 服务
         startEmbeddedServerIfNeeded()
         
-        // 3. 设置状态栏常驻图标
+        // 3. 设置状态栏常驻图标 (使用规范的 isTemplate 矢量模板图标，完美适配刘海屏与系统主题)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.title = "✨"
-            button.toolTip = "ZCODE提示词润色"
-            button.action = #selector(togglePanel)
+            button.image = createTemplateStatusIcon()
+            button.imagePosition = .imageOnly
+            button.toolTip = "ZCODE提示词润色 (左键显示/隐藏，右键菜单)"
+            button.action = #selector(statusItemClicked(_:))
             button.target = self
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         
-        // 4. 初始化标准应用窗口 (初始居右上方，尺寸 520 x 440)
+        // 4. 初始化标准应用窗口
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let panelWidth: CGFloat = 520
         let panelHeight: CGFloat = 440
@@ -172,7 +178,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel?.contentView?.addSubview(webView!)
         
         // 6. 加载本地服务页面
-        if let url = URL(string: "http://localhost:38921") {
+        if let url = URL(string: "http://127.0.0.1:38921") {
             let request = URLRequest(url: url)
             webView?.load(request)
         }
@@ -181,11 +187,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
     
-    // 配置 macOS 标准主菜单系统 (彻底激活系统级快捷键通道)
+    // 矢量绘制 18x18 Template 菜单栏图标 (深浅色菜单栏自动高亮与反色)
+    private func createTemplateStatusIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let img = NSImage(size: size, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.setFillColor(NSColor.black.cgColor)
+
+            // 绘制精细的星芒光标
+            let cx: CGFloat = 9.0
+            let cy: CGFloat = 9.0
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: cx, y: cy + 7.5))
+            path.addQuadCurve(to: CGPoint(x: cx + 7.5, y: cy), control: CGPoint(x: cx + 1.8, y: cy + 1.8))
+            path.addQuadCurve(to: CGPoint(x: cx, y: cy - 7.5), control: CGPoint(x: cx + 1.8, y: cy - 1.8))
+            path.addQuadCurve(to: CGPoint(x: cx - 7.5, y: cy), control: CGPoint(x: cx - 1.8, y: cy - 1.8))
+            path.addQuadCurve(to: CGPoint(x: cx, y: cy + 7.5), control: CGPoint(x: cx - 1.8, y: cy + 1.8))
+            path.closeSubpath()
+
+            ctx.addPath(path)
+            ctx.fillPath()
+            return true
+        }
+        img.isTemplate = true
+        return img
+    }
+    
+    // 状态栏图标点击处理 (区分左键切换与右键菜单)
+    @objc func statusItemClicked(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp {
+            let menu = NSMenu()
+            menu.addItem(withTitle: "显示/隐藏主窗口", action: #selector(togglePanel), keyEquivalent: "")
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(withTitle: "关于 ZCODE提示词润色", action: nil, keyEquivalent: "")
+            menu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            statusItem?.menu = menu
+            statusItem?.button?.performClick(nil)
+            statusItem?.menu = nil // 弹出后清空，保持默认左键单触发动作
+        } else {
+            togglePanel()
+        }
+    }
+    
+    // 配置 macOS 标准主菜单系统
     private func setupMainMenu() {
         let mainMenu = NSMenu()
         
-        // 应用程序主菜单
         let appMenuItem = NSMenuItem()
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu(title: "ZCODE提示词润色")
@@ -195,7 +243,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         
-        // 编辑菜单 (核心：负责转发 Cmd+C, Cmd+V, Cmd+X, Cmd+A, Cmd+Z 到 WKWebView)
         let editMenuItem = NSMenuItem()
         mainMenu.addItem(editMenuItem)
         let editMenu = NSMenu(title: "Edit")
@@ -210,7 +257,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenuItem.submenu = editMenu
         
-        // 窗口菜单
         let winMenuItem = NSMenuItem()
         mainMenu.addItem(winMenuItem)
         let winMenu = NSMenu(title: "Window")
@@ -266,11 +312,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    // 启动 30 FPS 轻量跟随定时器
+    // 启动具有智能动态降频的磁贴跟随定时器 (P1 性能优化)
     private func startDockTracking() {
         stopDockTracking()
-        let timer = Timer(timeInterval: 0.033, repeats: true) { [weak self] _ in
-            self?.updateDockPosition(animated: false)
+        isHighRate = true
+        staticTickCount = 0
+        scheduleTrackingTimer(interval: 0.033) // 初始 30 FPS 极速对齐
+    }
+    
+    private func scheduleTrackingTimer(interval: TimeInterval) {
+        dockTrackingTimer?.invalidate()
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            self?.dockTrackingTick()
         }
         RunLoop.main.add(timer, forMode: .common)
         dockTrackingTimer = timer
@@ -281,7 +334,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         dockTrackingTimer = nil
     }
     
-    // 实时计算吸附坐标与尺寸 (平滑防抖跟随)
+    private func dockTrackingTick() {
+        guard panel != nil, isDocked else { return }
+        let currentTarget = getZCodeWindowFrame()
+        
+        // 动态判定目标窗口是否处于静止状态
+        if let last = lastTargetFrame, let cur = currentTarget,
+           abs(last.origin.x - cur.origin.x) < 0.5 &&
+           abs(last.origin.y - cur.origin.y) < 0.5 &&
+           abs(last.size.width - cur.size.width) < 0.5 &&
+           abs(last.size.height - cur.size.height) < 0.5 {
+            staticTickCount += 1
+            // 若静止超过 1.5 秒 (45 帧)，自动降频至 0.5 秒一次，消除静止时的 CPU 浪费
+            if staticTickCount > 45 && isHighRate {
+                isHighRate = false
+                scheduleTrackingTimer(interval: 0.5)
+            }
+        } else {
+            lastTargetFrame = currentTarget
+            staticTickCount = 0
+            if !isHighRate {
+                isHighRate = true
+                scheduleTrackingTimer(interval: 0.033) // 发生移动，立刻恢复 30 FPS 高帧率跟手
+            }
+        }
+        
+        updateDockPosition(animated: false)
+    }
+    
     private func updateDockPosition(animated: Bool) {
         guard let panel = panel, isDocked else { return }
         let currentScreen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
@@ -315,9 +395,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         serverProcess?.terminate()
     }
     
+    // 关键唤醒逻辑：优先还原已最小化窗口，再执行显示/隐藏切换
     @objc func togglePanel() {
         guard let panel = panel else { return }
-        if panel.isVisible {
+        
+        // 修复关键缺陷：如果已被最小化到 Dock，必须先唤醒还原
+        if panel.isMiniaturized {
+            panel.deminiaturize(nil)
+            panel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        
+        if panel.isVisible && NSApp.isActive {
             panel.orderOut(nil)
         } else {
             panel.makeKeyAndOrderFront(nil)
@@ -329,6 +419,5 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-// 设置为标准独立桌面应用，参与系统调度中心多任务与窗口切换
 app.setActivationPolicy(.regular)
 app.run()

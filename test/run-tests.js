@@ -139,4 +139,24 @@ assert.ok(fullCombined.endsWith(advice1.directive), 'ZCode 调度指令应在末
 console.log('   ✅ 追加到提示词末尾逻辑验证正确');
 console.log('   ✅ ZCode 能力建议器测试通过！\n');
 
-console.log('🎉 所有自动化测试全部通过 (6/6)！');
+// ----------------------------------------------------
+// Test 7: P0 安全加固与注入攻击拦截防御验证
+// ----------------------------------------------------
+console.log('▶️ [Test 7] 验证 P0 安全加固：SQL / Shell 注入拦截与字符白名单');
+const maliciousInputs = [
+  "'; DROP TABLE session; --",
+  "$(whoami)",
+  "`id`",
+  "sess_123' OR '1'='1",
+  "../../../etc/passwd",
+  "sess_test; rm -rf /"
+];
+
+for (const input of maliciousInputs) {
+  const result = ZCodeSessionResolver.resolveSession(input);
+  assert.strictEqual(result, null, `恶意注入应当被拦截为 null: ${input}`);
+}
+console.log('   ✅ 成功拦截所有潜在恶意 SQL / 命令注入请求 (6/6)');
+console.log('   ✅ P0 安全防御测试通过！\n');
+
+console.log('🎉 所有自动化测试全部通过 (7/7)！');

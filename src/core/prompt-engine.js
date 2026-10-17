@@ -86,8 +86,8 @@ export class PromptEngine {
     cleaned = cleaned.replace(/^["'“”‘’]|["'“”‘’]$/g, '').trim();
     // 剔除模型可能自作聪明带上的 Markdown 代码块标记（如 ```markdown ... ``` 或 ```text ... ```）
     cleaned = cleaned.replace(/^```[a-zA-Z]*\n?([\s\S]*?)\n?```$/g, '$1').trim();
-    // 剔除常见的自言自语前言（如 "Enhanced prompt:", "润色后的提示词：", "优化结果："）
-    cleaned = cleaned.replace(/^(Enhanced prompt|(润色|优化|增强|改写)(后|结果|后的提示词|的提示词)?)[:：]\s*/i, '').trim();
+    // 剔除常见的自言自语前言（包括带 Markdown 加粗的 "Enhanced prompt:", "**润色后的提示词：**"）
+    cleaned = cleaned.replace(/^(\*{0,2}(Enhanced prompt|(润色|优化|增强|改写)(后|结果|后的提示词|的提示词)?)\*{0,2})[:：]\s*/i, '').trim();
     return cleaned;
   }
 
@@ -182,16 +182,42 @@ export class PromptEngine {
           stream: false,
         };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      signal,
-    });
+    // 15 秒超时熔断控制 (避免网络波动或端点失效导致界面永久悬停在 Loading 态)
+    const timeoutMs = options.timeoutMs || 15000;
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      timeoutController.abort(new Error(`大模型服务在 ${timeoutMs / 1000} 秒内未响应，已自动熔断。请检查网络、端点地址或 API Key 是否正确。`));
+    }, timeoutMs);
+
+    let effectiveSignal = timeoutController.signal;
+    if (signal) {
+      if (typeof AbortSignal.any === 'function') {
+        effectiveSignal = AbortSignal.any([signal, timeoutController.signal]);
+      } else {
+        signal.addEventListener('abort', () => timeoutController.abort(signal.reason), { once: true });
+      }
+    }
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: effectiveSignal,
+      });
+    } catch (fetchErr) {
+      if (timeoutController.signal.aborted && (!signal || !signal.aborted)) {
+        throw new Error(`大模型服务在 ${timeoutMs / 1000} 秒内未响应，已自动熔断。请检查端点配置或网络连通性。`);
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`LLM Request failed with status ${response.status}: ${errText}`);
+      const errText = await response.text().catch(() => '');
+      throw new Error(`LLM Request failed with status ${response.status}: ${errText.slice(0, 300)}`);
     }
 
     const resJson = await response.json();
