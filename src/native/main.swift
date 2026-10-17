@@ -187,26 +187,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
     
-    // 矢量绘制 18x18 Template 菜单栏图标 (深浅色菜单栏自动高亮与反色)
+    // 矢量绘制标准 18x18 圆角 Squircle Z 字符菜单栏图标 (等比尺寸、标准圆角、isTemplate自动反色)
     private func createTemplateStatusIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let img = NSImage(size: size, flipped: false) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             ctx.setFillColor(NSColor.black.cgColor)
 
-            // 绘制精细的星芒光标
-            let cx: CGFloat = 9.0
-            let cy: CGFloat = 9.0
             let path = CGMutablePath()
-            path.move(to: CGPoint(x: cx, y: cy + 7.5))
-            path.addQuadCurve(to: CGPoint(x: cx + 7.5, y: cy), control: CGPoint(x: cx + 1.8, y: cy + 1.8))
-            path.addQuadCurve(to: CGPoint(x: cx, y: cy - 7.5), control: CGPoint(x: cx + 1.8, y: cy - 1.8))
-            path.addQuadCurve(to: CGPoint(x: cx - 7.5, y: cy), control: CGPoint(x: cx - 1.8, y: cy - 1.8))
-            path.addQuadCurve(to: CGPoint(x: cx, y: cy + 7.5), control: CGPoint(x: cx - 1.8, y: cy + 1.8))
+
+            // 1. 标准 15x15 pt 外层圆角 Squircle 底座 (内边距 1.5pt，经典 4.0pt 圆角)
+            let squircleRect = CGRect(x: 1.5, y: 1.5, width: 15.0, height: 15.0)
+            path.addRoundedRect(in: squircleRect, cornerWidth: 4.0, cornerHeight: 4.0)
+
+            // 2. 居中对称镂空极简 "Z" 字符 (笔画宽度 1.8pt，中心 9.0, 9.0)
+            path.move(to: CGPoint(x: 5.0, y: 13.0))       // 顶横条 左上
+            path.addLine(to: CGPoint(x: 13.0, y: 13.0))   // 顶横条 右上
+            path.addLine(to: CGPoint(x: 13.0, y: 11.2))   // 顶横条 右下
+            path.addLine(to: CGPoint(x: 7.8, y: 6.8))     // 斜笔画 右下 (连接底条上方)
+            path.addLine(to: CGPoint(x: 13.0, y: 6.8))    // 底横条 右上
+            path.addLine(to: CGPoint(x: 13.0, y: 5.0))    // 底横条 右下
+            path.addLine(to: CGPoint(x: 5.0, y: 5.0))     // 底横条 左下
+            path.addLine(to: CGPoint(x: 5.0, y: 6.8))     // 底横条 左上
+            path.addLine(to: CGPoint(x: 10.2, y: 11.2))   // 斜笔画 左上 (连接顶条下方)
+            path.addLine(to: CGPoint(x: 5.0, y: 11.2))    // 顶横条 左下
             path.closeSubpath()
 
+            // 3. 采用 Even-Odd 缠绕规则实现负空间镂空效果
             ctx.addPath(path)
-            ctx.fillPath()
+            ctx.fillPath(using: .evenOdd)
             return true
         }
         img.isTemplate = true
