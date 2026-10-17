@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- 底座背景深邃黑曜石渐变 -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181a20"/>
+      <stop offset="40%" stop-color="#0f1015"/>
+      <stop offset="100%" stop-color="#07080a"/>
+    </linearGradient>
+
+    <!-- 1px 细致玻璃倒角边框高光 -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="40%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>
+    </linearGradient>
+
+    <!-- 核心光晕 (Ambient Bloom) -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#8b5cf6" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Z 顶横梁：电光青蓝 (Cyan -> Azure) -->
+    <linearGradient id="topGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+
+    <!-- Z 动态斜梁：霓虹靛紫穿透 (Azure -> Indigo -> Violet) -->
+    <linearGradient id="diagGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="35%" stop-color="#6366f1"/>
+      <stop offset="75%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+
+    <!-- Z 底基座：极光紫至玫红 (Violet -> Fuchsia) -->
+    <linearGradient id="botGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9333ea"/>
+      <stop offset="100%" stop-color="#c026d3"/>
+    </linearGradient>
+
+    <!-- 棱镜折角投影阴影 -->
+    <filter id="facetShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+
+    <filter id="glowFilter" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="36" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- 1. Apple 标准圆角 Squircle 底座 (896x896, 居中边距 64px, 圆角半径 200px) -->
+  <rect x="64" y="64" width="896" height="896" rx="200" ry="200" fill="url(#bgGrad)"/>
+  <rect x="64" y="64" width="896" height="896" rx="200" ry="200" fill="none" stroke="url(#rimGrad)" stroke-width="2"/>
+
+  <!-- 2. 底层环境泛光 -->
+  <circle cx="512" cy="512" r="380" fill="url(#centerGlow)"/>
+
+  <!-- 3. 核心几何多边形 Z 符号 (Precision Geometric Prism Z) -->
+  <g filter="url(#facetShadow)">
+    <!-- (1) 底基座 (Bottom Facet) -->
+    <path d="M 300 648 L 560 648 L 476 744 L 284 744 C 274 744 268 734 274 725 L 300 648 Z" 
+          fill="url(#botGrad)"/>
+    <path d="M 284 744 L 740 744 C 748 744 754 737 751 729 L 728 648 L 490 648 L 396 744 Z" 
+          fill="url(#botGrad)"/>
+
+    <!-- (2) 动态对角折面 (Main Diagonal Traverse) -->
+    <path d="M 732 280 C 742 280 748 290 742 299 L 366 738 C 361 744 353 744 348 744 L 284 744 C 274 744 268 734 274 725 L 650 286 C 655 280 663 280 668 280 Z" 
+          fill="url(#diagGrad)" 
+          filter="url(#glowFilter)"/>
+
+    <!-- (3) 顶横梁 (Top Facet) -->
+    <path d="M 284 280 C 276 280 270 287 273 295 L 296 376 L 534 376 L 628 280 Z" 
+          fill="url(#topGrad)"/>
+    <path d="M 724 280 L 464 280 L 548 376 L 740 376 C 750 376 756 366 750 357 L 724 280 Z" 
+          fill="url(#topGrad)"/>
+  </g>
+
+  <!-- 4. 极简科技代码高光点缀 (Code Spark 菱形能量核) -->
+  <g transform="translate(744, 276)">
+    <path d="M 0 -18 L 14 0 L 0 18 L -14 0 Z" fill="#38bdf8" opacity="0.95"/>
+    <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+  </g>
+
+  <!-- 5. 左下辅助代码闭合点缀 (Code Bracket Subtle Accent) -->
+  <g transform="translate(268, 736)">
+    <path d="M 0 -12 L 10 0 L 0 12 L -10 0 Z" fill="#c026d3" opacity="0.85"/>
+  </g>
+</svg>
