@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZCODE提示词润色</title>
+  <style>
+    /* ============================================================
+       1. 主题变量体系 (现代暗色、纯黑 OLED、ZCode 专属同步色、浅色模式)
+       ============================================================ */
+    :root, [data-theme="dark"] {
+      --bg-primary: rgba(28, 28, 30, 0.94);
+      --bg-secondary: rgba(44, 44, 46, 0.78);
+      --bg-card: rgba(58, 58, 60, 0.52);
+      --border: rgba(255, 255, 255, 0.12);
+      --border-focus: rgba(10, 132, 255, 0.55);
+      --text-main: #f5f5f7;
+      --text-muted: #8e8e93;
+      --accent: #0a84ff;
+      --accent-gradient: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+      --accent-glow: rgba(168, 85, 247, 0.35);
+      --zcode-color: #38bdf8;
+      --success: #30d158;
+      --warning: #ff9f0a;
+    }
+
+    [data-theme="pure-black"] {
+      --bg-primary: #000000;
+      --bg-secondary: #09090b;
+      --bg-card: #141416;
+      --border: #27272a;
+      --border-focus: #3b82f6;
+      --text-main: #ffffff;
+      --text-muted: #71717a;
+      --accent: #2563eb;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --zcode-color: #38bdf8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+
+    [data-theme="zcode-sync"] {
+      --bg-primary: #18181b;
+      --bg-secondary: #27272a;
+      --bg-card: #202023;
+      --border: #3f3f46;
+      --border-focus: #38bdf8;
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --accent: #38bdf8;
+      --accent-gradient: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+      --accent-glow: rgba(56, 189, 248, 0.3);
+      --zcode-color: #38bdf8;
+      --success: #34d399;
+      --warning: #fbbf24;
+    }
+
+    [data-theme="light"] {
+      --bg-primary: rgba(246, 246, 248, 0.96);
+      --bg-secondary: rgba(238, 240, 243, 0.92);
+      --bg-card: #ffffff;
+      --border: rgba(0, 0, 0, 0.12);
+      --border-focus: rgba(2, 132, 199, 0.7);
+      --text-main: #1d1d1f;
+      --text-muted: #6e6e73;
+      --accent: #0284c7;
+      --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+      --accent-glow: rgba(37, 99, 235, 0.2);
+      --zcode-color: #0284c7;
+      --success: #15803d;
+      --warning: #b45309;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: transparent;
+      color: var(--text-main);
+      overflow: hidden;
+      user-select: none;
+      padding: 0;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .container {
+      background: var(--bg-primary);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 顶部导航与拖拽区域 */
+    .header {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+      gap: 8px;
+      -webkit-app-region: drag;
+      cursor: grab;
+      min-height: 44px;
+    }
+
+    .header:active {
+      cursor: grabbing;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      white-space: nowrap;
+      -webkit-app-region: drag;
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+
+    .brand .logo-icon {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: var(--accent-gradient);
+      box-shadow: 0 0 10px var(--accent-glow);
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+      flex-shrink: 0;
+    }
+
+    /* 通用图标按钮 */
+    .btn-icon {
+      padding: 5px 8px;
+      font-size: 12px;
+      border-radius: 6px;
+      transition: all 0.18s ease;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-icon:hover {
+      background: var(--bg-secondary);
+      color: var(--text-main);
+    }
+
+    .btn-icon.active {
+      background: rgba(10, 132, 255, 0.25);
+      border-color: rgba(10, 132, 255, 0.55);
+      color: #70b4ff;
+      box-shadow: 0 0 8px rgba(10, 132, 255, 0.35);
+    }
+
+    /* ZCode 联动胶囊按钮 */
+    .zcode-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--zcode-color);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .zcode-btn:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+
+    .project-selector {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex-shrink: 1;
+    }
+
+    .project-selector:hover {
+      background: var(--bg-secondary);
+      border-color: var(--border-focus);
+    }
+
+    .project-badge {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px rgba(48, 209, 88, 0.6);
+      flex-shrink: 0;
+    }
+
+    .project-badge.unbound {
+      background: var(--text-muted);
+      box-shadow: none;
+    }
+
+    /* 技术栈画像标签条 */
+    .profile-bar {
+      padding: 5px 12px;
+      background: var(--bg-secondary);
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .profile-tag {
+      background: rgba(10, 132, 255, 0.15);
+      color: #70b4ff;
+      border: 1px solid rgba(10, 132, 255, 0.3);
+      padding: 1px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    [data-theme="light"] .profile-tag {
+      background: rgba(2, 132, 199, 0.12);
+      color: #0369a1;
+      border-color: rgba(2, 132, 199, 0.25);
+    }
+
+    /* 主编辑与预览区 */
+    .main-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 12px;
+      gap: 8px;
+      overflow-y: auto;
+    }
+
+    .textarea-box {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 80px;
+    }
+
+    textarea {
+      width: 100%;
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text-main);
+      font-size: 13px;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      transition: all 0.2s ease;
+      min-height: 100px;
+    }
+
+    textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18);
+    }
+
+    textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .box-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 5px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ZCode 建议卡片 */
+    .zcode-advice-box {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      animation: fadeIn 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .advice-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .advice-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: var(--zcode-color);
+      font-size: 11px;
+      flex-wrap: wrap;
+    }
+
+    .advice-badges {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .advice-badge {
+      background: rgba(56, 189, 248, 0.18);
+      color: #7dd3fc;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    [data-theme="light"] .advice-badge {
+      background: rgba(2, 132, 199, 0.12);
+      color: #0369a1;
+      border-color: rgba(2, 132, 199, 0.3);
+    }
+
+    .advice-actions {
+      display: flex;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .btn-sm {
+      padding: 3px 7px;
+      font-size: 11px;
+      border-radius: 5px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-sm.btn-enhance {
+      background: var(--accent-gradient);
+      color: white;
+    }
+
+    .btn-sm.btn-secondary {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+    }
+
+    .btn-sm:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .advice-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .advice-reason {
+      color: var(--text-muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .advice-directive-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--text-main);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .advice-directive-box pre {
+      margin: 0;
+      font-family: inherit;
+      white-space: pre-wrap;
+    }
+
+    /* 底部操作工具栏 */
+    .footer {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border);
+      background: var(--bg-secondary);
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .shortcut-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .shortcut-hint kbd {
+      background: rgba(125, 125, 125, 0.15);
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+
+    .button-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .btn-enhance {
+      background: var(--accent-gradient);
+      color: white;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    .btn-enhance:hover:not(:disabled) {
+      box-shadow: 0 4px 14px rgba(168, 85, 247, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-revert {
+      background: var(--bg-card);
+      color: var(--warning);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-secondary);
+    }
+
+    /* 矢量图标通用样式 */
+    .icon {
+      width: 14px;
+      height: 14px;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    .icon-spin {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* 纯文本紧凑模式 (隐藏图标) */
+    .text-only-mode .icon {
+      display: none !important;
+    }
+
+    /* 提示消息浮层 */
+    .toast {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 5px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* 模态弹层 */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      z-index: 500;
+      padding: 14px;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    }
+
+    .modal-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .modal-body {
+      padding: 12px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .session-input-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .session-input-row input,
+    .modal-body input,
+    .modal-body select {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--text-main);
+      font-size: 11px;
+      outline: none;
+    }
+
+    .session-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      overflow-y: auto;
+    }
+
+    .session-item {
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: all 0.15s ease;
+    }
+
+    .session-item:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    .session-title {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .session-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ============================================================
+       2. macOS 规范红黄绿三点窗口控制按钮
+       ============================================================ */
+    .traffic-lights {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      -webkit-app-region: no-drag;
+      margin-right: 6px;
+      flex-shrink: 0;
+    }
+
+    .traffic-btn {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      outline: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.15s ease, transform 0.1s ease;
+    }
+
+    .traffic-btn:hover {
+      opacity: 0.9;
+      transform: scale(1.06);
+    }
+
+    .traffic-close { background-color: #ff5f56; border: 0.5px solid #e0443e; }
+    .traffic-min   { background-color: #ffbd2e; border: 0.5px solid #dea123; }
+    .traffic-zoom  { background-color: #27c93f; border: 0.5px solid #1aab29; }
+
+    .traffic-lights:hover .traffic-close::before {
+      content: "×";
+      font-size: 10px;
+      font-weight: 700;
+      color: #4d0000;
+      line-height: 1;
+    }
+    .traffic-lights:hover .traffic-min::before {
+      content: "–";
+      font-size: 10px;
+      font-weight: 700;
+      color: #5c3b00;
+      line-height: 1;
+    }
+    .traffic-lights:hover .traffic-zoom::before {
+      content: "+";
+      font-size: 10px;
+      font-weight: 700;
+      color: #004d11;
+      line-height: 1;
+    }
+
+    /* ============================================================
+       3. 弹性自适应响应式排版 (@media 查询优化，放宽至 260px)
+       ============================================================ */
+    @media (max-width: 440px) {
+      .brand span {
+        display: none;
+      }
+      .project-selector {
+        max-width: 110px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .header {
+        padding: 6px 8px;
+        gap: 4px;
+      }
+      .zcode-btn span {
+        display: none;
+      }
+      .project-selector {
+        max-width: 75px;
+        padding: 3px 5px;
+      }
+      textarea {
+        min-height: 70px;
+      }
+      .shortcut-hint {
+        display: none;
+      }
+      .button-group {
+        width: 100%;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+      .btn {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+      .advice-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+      .advice-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 280px) {
+      .header {
+        padding: 5px 6px;
+        gap: 3px;
+      }
+      .brand {
+        display: none;
+      }
+      .header-actions {
+        gap: 3px;
+      }
+      .project-selector {
+        max-width: 24px;
+        padding: 3px;
+        justify-content: center;
+      }
+      .project-selector span:not(.project-badge) {
+        display: none;
+      }
+      .btn-icon {
+        padding: 3px 4px;
+      }
+      .box-footer #statusHint {
+        display: none;
+      }
+      .box-footer {
+        justify-content: flex-end;
+      }
+      .button-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3px;
+        width: 100%;
+      }
+      .button-group .btn {
+        width: 100%;
+        padding: 4px 2px;
+        font-size: 10px;
+        justify-content: center;
+      }
+      .button-group #enhanceBtn {
+        grid-column: span 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toast" id="toast">已就绪</div>
+
+  <div class="container" id="appContainer">
+    <!-- 头部工具条 -->
+    <div class="header">
+      <!-- 标准 macOS 红黄绿窗口控制三点按钮 -->
+      <div class="traffic-lights">
+        <button class="traffic-btn traffic-close" id="winCloseBtn" title="关闭窗口"></button>
+        <button class="traffic-btn traffic-min" id="winMinBtn" title="最小化窗口"></button>
+        <button class="traffic-btn traffic-zoom" id="winZoomBtn" title="缩放/全屏"></button>
+      </div>
+
+      <div class="brand">
+        <div class="logo-icon">
+          <!-- 矢量 Sparkles 图标 -->
+          <svg class="icon" viewBox="0 0 24 24">
+            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/>
+          </svg>
+        </div>
+        <span>ZCODE提示词润色</span>
+      </div>
+
+      <div class="header-actions">
+        <!-- ZCode 联动入口 -->
+        <button class="zcode-btn" id="openZCodeModalBtn" title="按会话 ID 或从最近会话一键联动 ZCode 窗口">
+          <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>联动 ZCODE</span>
+        </button>
+
+        <!-- 本地文件夹选择 -->
+        <div class="project-selector" id="projectSelectorBtn" title="点击选择或切换本地文件夹">
+          <span class="project-badge" id="projectBadge"></span>
+          <span id="projectNameText">选择项目...</span>
+        </div>
+
+        <!-- 靠右吸附与联动跟随模式按钮 -->
+        <button class="btn-icon" id="dockBtn" title="切换右侧吸附模式 (磁贴贴合 ZCODE 窗口右侧)">
+          <svg class="icon" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>
+        </button>
+
+        <!-- 置顶/取消置顶按钮 -->
+        <button class="btn-icon" id="pinWindowBtn" title="切换窗口置顶 (Always on Top)">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+        </button>
+
+        <!-- 模型与外观设置按钮 -->
+        <button class="btn-icon" id="openModelConfigBtn" title="偏好设置 (模型、外观主题、工程展示)">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 关联项目的架构技术栈指纹 (支持过滤 Unknown 与隐藏) -->
+    <div class="profile-bar" id="profileBar" style="display: none;">
+      <span style="color: var(--text-muted);" id="profileSourceLabel">技术画像:</span>
+      <div id="profileTags" style="display: flex; gap: 5px;"></div>
+    </div>
+
+    <!-- 输入与编辑区域 -->
+    <div class="main-body">
+      <div class="textarea-box">
+        <textarea id="promptInput" placeholder="输入口语化的需求或 Prompt（如：写个支持大文件分片上传的组件）...&#10;快捷键：按 Cmd+Enter 立即润色"></textarea>
+        <div class="box-footer">
+          <span id="statusHint">支持一键润色、撤销回退与 ZCode 工程画像自适应</span>
+          <span id="charCount">0 字符</span>
+        </div>
+      </div>
+
+      <!-- ZCode 能力引用建议卡片 (默认隐藏，支持按需展开/追加) -->
+      <div class="zcode-advice-box" id="zcodeAdviceBox" style="display: none;">
+        <div class="advice-header">
+          <div class="advice-title">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+            <span>ZCODE 建议调度:</span>
+            <div id="adviceBadges" class="advice-badges"></div>
+          </div>
+          <div class="advice-actions">
+            <button class="btn-sm btn-secondary" id="copyAdviceOnlyBtn" title="仅复制建议指令">
+              <svg class="icon" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <span>仅复制建议</span>
+            </button>
+            <button class="btn-sm btn-enhance" id="appendAdviceBtn" title="将此建议追加到提示词末尾">
+              <svg class="icon" viewBox="0 0 24 24"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+              <span>追加到提示词末尾</span>
+            </button>
+          </div>
+        </div>
+        <div class="advice-body" id="adviceBody">
+          <div class="advice-reason" id="adviceReason"></div>
+          <div class="advice-directive-box">
+            <pre id="adviceDirectiveText"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部状态与操作按钮 -->
+    <div class="footer">
+      <div class="shortcut-hint">
+        快捷键: <kbd>Cmd+Enter</kbd> 增强 / <kbd>Cmd+Z</kbd> 撤销
+      </div>
+      <div class="button-group">
+        <!-- ZCode 能力建议切换按钮 -->
+        <button class="btn btn-secondary" id="zcodeAdviceToggleBtn" style="display: none;" title="显示或隐藏 ZCode 能力引用建议">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+          <span id="zcodeAdviceToggleText">显示 ZCODE 建议</span>
+        </button>
+
+        <button class="btn btn-revert" id="revertBtn" style="display: none;">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+          <span>恢复原文</span>
+        </button>
+
+        <button class="btn btn-secondary" id="copyBtn">
+          <svg class="icon" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          <span>复制</span>
+        </button>
+
+        <button class="btn btn-enhance" id="enhanceBtn">
+          <span id="enhanceIconWrapper">
+            <svg class="icon" id="enhanceIcon" viewBox="0 0 24 24">
+              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/>
+            </svg>
+          </span>
+          <span id="enhanceText">增强提示词</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ZCode 会话选择弹层 -->
+    <div class="modal-overlay" id="zcodeModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <svg class="icon" style="color:var(--zcode-color)" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>联动 ZCODE 窗口与会话</span>
+          </div>
+          <span style="cursor: pointer; font-size: 16px;" id="closeZCodeModalBtn">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div style="font-size: 11px; color: var(--text-muted);">
+            输入 ZCode 会话 ID（如 sess_aca08...），自动锁定对应的工作区工程目录与技术栈画像：
+          </div>
+          <div class="session-input-row">
+            <input type="text" id="manualSessionIdInput" placeholder="输入会话 ID (如 sess_xxx 或仅输入短 ID)...">
+            <button class="btn btn-secondary" id="confirmSessionIdBtn">关联</button>
+          </div>
+
+          <div style="font-size: 11px; font-weight: 600; margin-top: 6px; color: var(--zcode-color);">
+            最近活跃的 ZCode 会话:
+          </div>
+          <div class="session-list" id="recentSessionsList">
+            <div style="font-size: 11px; color: var(--text-muted); padding: 8px;">加载中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置弹层 (模型、外观主题、工程状态栏自定义) -->
+    <div class="modal-overlay" id="modelConfigModal">
+      <div class="modal-content" style="max-height: 430px;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>偏好设置</span>
+          </div>
+          <span style="cursor: pointer; font-size: 16px;" id="closeModelConfigModalBtn">&times;</span>
+        </div>
+        <div class="modal-body">
+          <!-- 外观主题设置 -->
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--zcode-color);">外观与配色主题:</label>
+            <select id="themeSelect">
+              <option value="system">跟随系统 (System - 自动切换深浅色)</option>
+              <option value="light">浅色模式 (Light Mode - 舒适清爽高对比度)</option>
+              <option value="dark">现代暗色 (Modern Dark - 半透明毛玻璃)</option>
+              <option value="pure-black">纯黑模式 (Pure Black - OLED极致深黑)</option>
+              <option value="zcode-sync">ZCode 专属同步色 (完美契合 ZCode 客户端色系)</option>
+            </select>
+          </div>
+
+          <!-- 状态标识设置 -->
+          <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--zcode-color);">工程状态标识展示:</label>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="showProfileBarCheck" checked style="cursor: pointer;">
+              <label for="showProfileBarCheck" style="font-size: 11px; cursor: pointer;">显示技术栈画像条</label>
+            </div>
+            <input type="text" id="customProjectAliasInput" placeholder="自定义当前工程展示别名 (如: 默认工作区)">
+          </div>
+
+          <!-- 图标模式 -->
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+            <input type="checkbox" id="textOnlyModeCheck" style="cursor: pointer;">
+            <label for="textOnlyModeCheck" style="font-size: 11px; cursor: pointer;">纯文本紧凑模式 (隐藏所有图标)</label>
+          </div>
+
+          <div style="height: 1px; background: var(--border); margin: 4px 0;"></div>
+
+          <!-- 大模型配置 -->
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--zcode-color);">大模型 (LLM) 服务:</label>
+            <select id="modelPresetSelect">
+              <option value="deepseek">DeepSeek-V3 (推荐: 极速且懂中文)</option>
+              <option value="ollama">本地 Ollama (完全离线 0 费用)</option>
+              <option value="openai">OpenAI (GPT-4o-mini)</option>
+              <option value="custom">自定义 (Custom Endpoint)</option>
+            </select>
+
+            <input type="text" id="configEndpointInput" placeholder="API 端点 (如: https://api.deepseek.com)">
+            <input type="password" id="configApiKeyInput" placeholder="API Key (本地 Ollama 可留空)">
+            <input type="text" id="configModelNameInput" placeholder="模型名 (如: deepseek-chat)">
+          </div>
+
+          <button class="btn btn-enhance" id="saveModelConfigBtn" style="margin-top: 6px; justify-content: center;">
+            保存配置
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const appContainer = document.getElementById('appContainer');
+    const promptInput = document.getElementById('promptInput');
+    const enhanceBtn = document.getElementById('enhanceBtn');
+    const enhanceIconWrapper = document.getElementById('enhanceIconWrapper');
+    const enhanceText = document.getElementById('enhanceText');
+    const revertBtn = document.getElementById('revertBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const charCount = document.getElementById('charCount');
+    const statusHint = document.getElementById('statusHint');
+    const toast = document.getElementById('toast');
+    const projectSelectorBtn = document.getElementById('projectSelectorBtn');
+    const projectNameText = document.getElementById('projectNameText');
+    const projectBadge = document.getElementById('projectBadge');
+    const profileBar = document.getElementById('profileBar');
+    const profileTags = document.getElementById('profileTags');
+    const profileSourceLabel = document.getElementById('profileSourceLabel');
+
+    // 窗口与吸附按钮
+    const pinWindowBtn = document.getElementById('pinWindowBtn');
+    const dockBtn = document.getElementById('dockBtn');
+
+    // ZCode Modal 元素
+    const zcodeModal = document.getElementById('zcodeModal');
+    const openZCodeModalBtn = document.getElementById('openZCodeModalBtn');
+    const closeZCodeModalBtn = document.getElementById('closeZCodeModalBtn');
+    const manualSessionIdInput = document.getElementById('manualSessionIdInput');
+    const confirmSessionIdBtn = document.getElementById('confirmSessionIdBtn');
+    const recentSessionsList = document.getElementById('recentSessionsList');
+
+    // ZCode 能力建议组件元素
+    const zcodeAdviceToggleBtn = document.getElementById('zcodeAdviceToggleBtn');
+    const zcodeAdviceToggleText = document.getElementById('zcodeAdviceToggleText');
+    const zcodeAdviceBox = document.getElementById('zcodeAdviceBox');
+    const adviceBadges = document.getElementById('adviceBadges');
+    const adviceReason = document.getElementById('adviceReason');
+    const adviceDirectiveText = document.getElementById('adviceDirectiveText');
+    const appendAdviceBtn = document.getElementById('appendAdviceBtn');
+    const copyAdviceOnlyBtn = document.getElementById('copyAdviceOnlyBtn');
+
+    // 设置 Modal 元素
+    const modelConfigModal = document.getElementById('modelConfigModal');
+    const openModelConfigBtn = document.getElementById('openModelConfigBtn');
+    const closeModelConfigModalBtn = document.getElementById('closeModelConfigModalBtn');
+    const themeSelect = document.getElementById('themeSelect');
+    const showProfileBarCheck = document.getElementById('showProfileBarCheck');
+    const customProjectAliasInput = document.getElementById('customProjectAliasInput');
+    const textOnlyModeCheck = document.getElementById('textOnlyModeCheck');
+    const modelPresetSelect = document.getElementById('modelPresetSelect');
+    const configEndpointInput = document.getElementById('configEndpointInput');
+    const configApiKeyInput = document.getElementById('configApiKeyInput');
+    const configModelNameInput = document.getElementById('configModelNameInput');
+    const saveModelConfigBtn = document.getElementById('saveModelConfigBtn');
+
+    // 矢量图标模板
+    const ICONS = {
+      sparkles: `<svg class="icon" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>`,
+      spinner: `<svg class="icon icon-spin" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`
+    };
+
+    let state = {
+      isEnhancing: false,
+      hasBackup: false,
+      backupText: { before: '', after: '' },
+      abortController: null,
+      currentProjectDir: localStorage.getItem('prompt_enhancer_project_dir') || '',
+      currentSessionTitle: localStorage.getItem('prompt_enhancer_session_title') || '',
+      currentAdvice: null,
+      isPinned: localStorage.getItem('prompt_enhancer_pinned') === 'true', // 默认不强制全局置顶，支持调度中心平铺
+      isDocked: localStorage.getItem('prompt_enhancer_docked') === 'true'
+    };
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    promptInput.addEventListener('input', () => {
+      charCount.textContent = `${promptInput.value.length} 字符`;
+      if (state.hasBackup && promptInput.value !== state.backupText.after) {
+        state.hasBackup = false;
+        state.backupText = { before: '', after: '' };
+        updateUIState();
+      }
+    });
+
+    function updateUIState() {
+      if (state.isEnhancing) {
+        enhanceBtn.disabled = false;
+        enhanceIconWrapper.innerHTML = ICONS.spinner;
+        enhanceText.textContent = '取消增强';
+        enhanceBtn.classList.remove('btn-enhance');
+        enhanceBtn.classList.add('btn-secondary');
+        revertBtn.style.display = 'none';
+        statusHint.textContent = '正在由 Prompt 架构专家智能优化中... (点击可取消)';
+      } else {
+        enhanceIconWrapper.innerHTML = ICONS.sparkles;
+        enhanceText.textContent = '增强提示词';
+        enhanceBtn.classList.remove('btn-secondary');
+        enhanceBtn.classList.add('btn-enhance');
+
+        if (state.hasBackup) {
+          revertBtn.style.display = 'inline-flex';
+          statusHint.textContent = '提示词已优化完成！若不满意可点击“恢复原文”';
+        } else {
+          revertBtn.style.display = 'none';
+          statusHint.textContent = '支持一键润色、撤销回退与 ZCode 工程画像自适应';
+        }
+      }
+    }
+
+    async function handleTriggerEnhance() {
+      const text = promptInput.value.trim();
+      if (!text) {
+        promptInput.focus();
+        return;
+      }
+
+      if (state.isEnhancing) {
+        if (state.abortController) state.abortController.abort();
+        state.isEnhancing = false;
+        updateUIState();
+        return;
+      }
+
+      const originalText = promptInput.value;
+      state.isEnhancing = true;
+      state.abortController = new AbortController();
+      updateUIState();
+
+      try {
+        const modelConfig = getModelConfig();
+        const res = await fetch('/api/enhance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: originalText,
+            projectDir: state.currentProjectDir || null,
+            endpoint: modelConfig.endpoint || void 0,
+            apiKey: modelConfig.apiKey || void 0,
+            model: modelConfig.model || void 0
+          }),
+          signal: state.abortController.signal
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `请求失败 (${res.status})`);
+        }
+
+        const data = await res.json();
+        const enhanced = data.text;
+
+        state.hasBackup = true;
+        state.backupText = { before: originalText, after: enhanced };
+        promptInput.value = enhanced;
+        charCount.textContent = `${enhanced.length} 字符`;
+
+        // 处理 ZCode 能力建议
+        if (data.zcodeAdvice && data.zcodeAdvice.matched) {
+          state.currentAdvice = data.zcodeAdvice;
+          renderZCodeAdvice(data.zcodeAdvice);
+          zcodeAdviceToggleBtn.style.display = 'inline-flex';
+          zcodeAdviceToggleText.textContent = '显示 ZCODE 建议';
+          zcodeAdviceBox.style.display = 'none';
+        } else {
+          state.currentAdvice = null;
+          zcodeAdviceToggleBtn.style.display = 'none';
+          zcodeAdviceBox.style.display = 'none';
+        }
+
+        showToast('提示词已完成增强！');
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          showToast('已取消润色');
+        } else {
+          alert('润色失败: ' + err.message);
+        }
+      } finally {
+        state.isEnhancing = false;
+        state.abortController = null;
+        updateUIState();
+      }
+    }
+
+    function handleRevert() {
+      if (state.hasBackup && state.backupText.before) {
+        promptInput.value = state.backupText.before;
+        state.hasBackup = false;
+        state.backupText = { before: '', after: '' };
+        state.currentAdvice = null;
+        zcodeAdviceBox.style.display = 'none';
+        zcodeAdviceToggleBtn.style.display = 'none';
+        charCount.textContent = `${promptInput.value.length} 字符`;
+        updateUIState();
+        showToast('已恢复原始内容');
+      }
+    }
+
+    // 渲染 ZCode 建议
+    function renderZCodeAdvice(advice) {
+      if (!advice) return;
+      adviceBadges.innerHTML = '';
+      (advice.badges || []).forEach(b => {
+        const badgeEl = document.createElement('span');
+        badgeEl.className = 'advice-badge';
+        badgeEl.textContent = b;
+        adviceBadges.appendChild(badgeEl);
+      });
+      adviceReason.textContent = advice.reason ? `💡 场景分析: ${advice.reason}` : '';
+      adviceDirectiveText.textContent = advice.directive || '';
+    }
+
+    async function toggleZCodeAdvice() {
+      const isVisible = zcodeAdviceBox.style.display !== 'none';
+      if (isVisible) {
+        zcodeAdviceBox.style.display = 'none';
+        zcodeAdviceToggleText.textContent = '显示 ZCODE 建议';
+      } else {
+        if (!state.currentAdvice && promptInput.value.trim()) {
+          try {
+            const res = await fetch('/api/zcode-advisor', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: promptInput.value.trim(),
+                projectDir: state.currentProjectDir || null
+              })
+            });
+            if (res.ok) {
+              const adv = await res.json();
+              if (adv && adv.matched) {
+                state.currentAdvice = adv;
+                renderZCodeAdvice(adv);
+              }
+            }
+          } catch (e) {}
+        }
+        zcodeAdviceBox.style.display = 'flex';
+        zcodeAdviceToggleText.textContent = '隐藏 ZCODE 建议';
+      }
+    }
+
+    function appendAdviceToPrompt() {
+      if (!state.currentAdvice || !state.currentAdvice.appendText) {
+        showToast('暂无推荐指令');
+        return;
+      }
+      const currentVal = promptInput.value;
+      const appendStr = state.currentAdvice.appendText;
+      
+      if (currentVal.includes(state.currentAdvice.directive.trim())) {
+        showToast('建议指令已存在于提示词中');
+        return;
+      }
+
+      promptInput.value = currentVal.trimEnd() + appendStr;
+      charCount.textContent = `${promptInput.value.length} 字符`;
+      
+      if (state.hasBackup) {
+        state.backupText.after = promptInput.value;
+      }
+      showToast('已追加 ZCode 建议至提示词末尾！');
+    }
+
+    async function copyAdviceOnly() {
+      if (!state.currentAdvice || !state.currentAdvice.directive) return;
+      await navigator.clipboard.writeText(state.currentAdvice.directive);
+      showToast('已复制 ZCode 建议指令！');
+    }
+
+    async function handleCopy() {
+      const text = promptInput.value.trim();
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      showToast('已复制到剪贴板！');
+      fetch('/api/paste-to-active-app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      }).catch(() => {});
+    }
+
+    // 刷新项目画像 (已过滤 Unknown 噪音，并支持开关与别名)
+    async function refreshProjectProfile() {
+      const showProfileBar = localStorage.getItem('prompt_enhancer_show_profile_bar') !== 'false';
+      const customAlias = localStorage.getItem('prompt_enhancer_project_alias') || '';
+
+      if (!state.currentProjectDir) {
+        projectBadge.classList.add('unbound');
+        projectNameText.textContent = '未关联项目 (点击绑定)';
+        profileBar.style.display = 'none';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/project-profile?dir=' + encodeURIComponent(state.currentProjectDir));
+        if (res.ok) {
+          const profile = await res.json();
+          projectBadge.classList.remove('unbound');
+          
+          let displayProjectName = customAlias || profile.projectName;
+          if (displayProjectName === 'default') displayProjectName = '默认工作区';
+
+          if (state.currentSessionTitle) {
+            projectNameText.textContent = `⚡ ${state.currentSessionTitle}`;
+            profileSourceLabel.textContent = `ZCode [${displayProjectName}]:`;
+          } else {
+            projectNameText.textContent = displayProjectName;
+            profileSourceLabel.textContent = '技术画像:';
+          }
+
+          // 核心过滤：剔除为 "Unknown" 的冗余标签
+          const validLanguage = profile.language && profile.language !== 'Unknown' ? profile.language : null;
+          const tags = [validLanguage, ...(profile.frameworks || [])].filter(Boolean);
+
+          profileTags.innerHTML = '';
+          if (showProfileBar && tags.length > 0) {
+            tags.forEach(t => {
+              const tagEl = document.createElement('span');
+              tagEl.className = 'profile-tag';
+              tagEl.textContent = t;
+              profileTags.appendChild(tagEl);
+            });
+            profileBar.style.display = 'flex';
+          } else {
+            profileBar.style.display = 'none';
+          }
+        }
+      } catch (e) {
+        projectBadge.classList.add('unbound');
+        projectNameText.textContent = '路径不可达 (点击重选)';
+        profileBar.style.display = 'none';
+      }
+    }
+
+    async function loadRecentZCodeSessions() {
+      recentSessionsList.innerHTML = '<div style="font-size:11px; color:var(--text-muted); padding:8px;">加载中...</div>';
+      try {
+        const res = await fetch('/api/recent-zcode-sessions');
+        if (!res.ok) throw new Error('拉取失败');
+        const data = await res.json();
+        const sessions = data.sessions || [];
+
+        if (sessions.length === 0) {
+          recentSessionsList.innerHTML = '<div style="font-size:11px; color:var(--text-muted); padding:8px;">暂无本地 ZCode 会话记录</div>';
+          return;
+        }
+
+        recentSessionsList.innerHTML = '';
+        sessions.forEach(sess => {
+          const item = document.createElement('div');
+          item.className = 'session-item';
+          const dirName = sess.directory.split('/').pop() || '根目录';
+          item.innerHTML = `
+            <div class="session-title">${sess.title || '未命名会话'}</div>
+            <div class="session-meta">
+              <span>📁 ${dirName}</span>
+              <span>${sess.id.slice(0, 16)}...</span>
+            </div>
+          `;
+          item.onclick = () => {
+            selectSession(sess.id, sess.title, sess.directory);
+          };
+          recentSessionsList.appendChild(item);
+        });
+      } catch (err) {
+        recentSessionsList.innerHTML = `<div style="font-size:11px; color:var(--warning); padding:8px;">加载会话失败: ${err.message}</div>`;
+      }
+    }
+
+    function selectSession(sessionId, title, directory) {
+      state.currentProjectDir = directory;
+      state.currentSessionTitle = title;
+      localStorage.setItem('prompt_enhancer_project_dir', directory);
+      localStorage.setItem('prompt_enhancer_session_title', title);
+      zcodeModal.classList.remove('open');
+      refreshProjectProfile();
+      showToast(`已联动 ZCODE: ${title}`);
+    }
+
+    confirmSessionIdBtn.addEventListener('click', async () => {
+      const inputVal = manualSessionIdInput.value.trim();
+      if (!inputVal) return;
+
+      try {
+        const res = await fetch('/api/resolve-zcode-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: inputVal })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || '会话不存在');
+        }
+        const data = await res.json();
+        selectSession(data.session.id, data.session.title, data.session.directory);
+      } catch (err) {
+        alert('联动失败: ' + err.message);
+      }
+    });
+
+    openZCodeModalBtn.addEventListener('click', () => {
+      zcodeModal.classList.add('open');
+      loadRecentZCodeSessions();
+    });
+
+    closeZCodeModalBtn.addEventListener('click', () => {
+      zcodeModal.classList.remove('open');
+    });
+
+    enhanceBtn.addEventListener('click', handleTriggerEnhance);
+    revertBtn.addEventListener('click', handleRevert);
+    copyBtn.addEventListener('click', handleCopy);
+    zcodeAdviceToggleBtn.addEventListener('click', toggleZCodeAdvice);
+    appendAdviceBtn.addEventListener('click', appendAdviceToPrompt);
+    copyAdviceOnlyBtn.addEventListener('click', copyAdviceOnly);
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleTriggerEnhance();
+      }
+    });
+
+    projectSelectorBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/select-project-dir', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.dir) {
+            state.currentProjectDir = data.dir;
+            state.currentSessionTitle = '';
+            localStorage.setItem('prompt_enhancer_project_dir', data.dir);
+            localStorage.removeItem('prompt_enhancer_session_title');
+            refreshProjectProfile();
+            showToast('已绑定项目目录: ' + data.dir.split('/').pop());
+          }
+        }
+      } catch (e) {
+        const customDir = prompt('请输入本地项目绝对路径：', state.currentProjectDir);
+        if (customDir) {
+          state.currentProjectDir = customDir;
+          state.currentSessionTitle = '';
+          localStorage.setItem('prompt_enhancer_project_dir', customDir);
+          localStorage.removeItem('prompt_enhancer_session_title');
+          refreshProjectProfile();
+        }
+      }
+    });
+
+    // 窗口置顶控制
+    function updatePinState() {
+      if (state.isPinned) {
+        pinWindowBtn.classList.add('active');
+        pinWindowBtn.title = '当前已置顶 (点击取消置顶)';
+      } else {
+        pinWindowBtn.classList.remove('active');
+        pinWindowBtn.title = '当前未置顶 (点击窗口置顶)';
+      }
+      try {
+        window.webkit?.messageHandlers?.setAlwaysOnTop?.postMessage(state.isPinned);
+      } catch (e) {}
+    }
+
+    pinWindowBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.isPinned = !state.isPinned;
+      localStorage.setItem('prompt_enhancer_pinned', state.isPinned ? 'true' : 'false');
+      updatePinState();
+      showToast(state.isPinned ? '窗口已置顶 (Always on Top)' : '已取消窗口置顶');
+    });
+
+    // 右侧吸附与实时磁贴联动模式控制
+    function updateDockState() {
+      if (state.isDocked) {
+        dockBtn.classList.add('active');
+        dockBtn.title = '当前已开启磁贴联动 (点击恢复普通浮窗)';
+      } else {
+        dockBtn.classList.remove('active');
+        dockBtn.title = '切换右侧吸附模式 (磁贴贴合 ZCODE 窗口右侧)';
+      }
+      try {
+        window.webkit?.messageHandlers?.setDockMode?.postMessage(state.isDocked);
+      } catch (e) {}
+    }
+
+    dockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.isDocked = !state.isDocked;
+      localStorage.setItem('prompt_enhancer_docked', state.isDocked ? 'true' : 'false');
+      updateDockState();
+      showToast(state.isDocked ? '已开启 ZCODE 磁贴联动跟随' : '已还原普通浮窗');
+    });
+
+    // 窗口原生拖拽监听 (排除红黄绿及操作按钮)
+    const headerEl = document.querySelector('.header');
+    headerEl.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button, input, select, .project-selector, .btn-icon, .zcode-btn, .traffic-btn')) {
+        return;
+      }
+      try {
+        window.webkit?.messageHandlers?.startWindowDrag?.postMessage({});
+      } catch (err) {}
+    });
+
+    // macOS 标准红黄绿三点按钮原生操作绑定
+    document.getElementById('winCloseBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        window.webkit?.messageHandlers?.closeWindow?.postMessage({});
+      } catch (err) {}
+    });
+
+    document.getElementById('winMinBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        window.webkit?.messageHandlers?.miniaturizeWindow?.postMessage({});
+      } catch (err) {}
+    });
+
+    document.getElementById('winZoomBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        window.webkit?.messageHandlers?.zoomWindow?.postMessage({});
+      } catch (err) {}
+    });
+
+    // 键盘快捷键监听增强 (支持 Ctrl+C / Ctrl+V 以及 macOS Cmd+C / Cmd+V)
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && !e.metaKey) {
+        if (e.key === 'c' || e.key === 'C') {
+          const active = document.activeElement;
+          if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) {
+            const start = active.selectionStart;
+            const end = active.selectionEnd;
+            if (start !== end) {
+              const text = active.value.substring(start, end);
+              navigator.clipboard?.writeText(text).catch(() => {});
+            }
+          }
+        } else if (e.key === 'v' || e.key === 'V') {
+          const active = document.activeElement;
+          if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) {
+            navigator.clipboard?.readText().then(text => {
+              if (text) {
+                const start = active.selectionStart;
+                const end = active.selectionEnd;
+                const val = active.value;
+                active.value = val.substring(0, start) + text + val.substring(end);
+                active.selectionStart = active.selectionEnd = start + text.length;
+                active.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            }).catch(() => {});
+          }
+        }
+      }
+    });
+
+    // 主题管理与系统深浅色自适应
+    const PRESETS = {
+      deepseek: { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', apiKey: '' },
+      ollama: { endpoint: 'http://localhost:11434', model: 'qwen2.5-coder:7b', apiKey: '' },
+      openai: { endpoint: 'https://api.openai.com', model: 'gpt-4o-mini', apiKey: '' },
+      custom: { endpoint: '', model: '', apiKey: '' }
+    };
+
+    const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function resolveTheme(pref) {
+      if (pref === 'system') {
+        return systemDarkQuery.matches ? 'dark' : 'light';
+      }
+      return pref || 'dark';
+    }
+
+    function applyTheme(theme) {
+      const targetTheme = resolveTheme(theme);
+      document.documentElement.setAttribute('data-theme', targetTheme);
+      localStorage.setItem('prompt_enhancer_theme', theme || 'dark');
+    }
+
+    systemDarkQuery.addEventListener('change', () => {
+      const savedTheme = localStorage.getItem('prompt_enhancer_theme') || 'dark';
+      if (savedTheme === 'system') {
+        applyTheme('system');
+      }
+    });
+
+    function applyTextOnlyMode(isTextOnly) {
+      if (isTextOnly) {
+        document.body.classList.add('text-only-mode');
+      } else {
+        document.body.classList.remove('text-only-mode');
+      }
+      localStorage.setItem('prompt_enhancer_text_only', isTextOnly ? 'true' : 'false');
+    }
+
+    function getModelConfig() {
+      try {
+        const saved = localStorage.getItem('prompt_enhancer_model_config');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+      return PRESETS.deepseek;
+    }
+
+    function syncSettingsInputs() {
+      const cfg = getModelConfig();
+      configEndpointInput.value = cfg.endpoint || '';
+      configApiKeyInput.value = cfg.apiKey || '';
+      configModelNameInput.value = cfg.model || '';
+      modelPresetSelect.value = cfg.preset || 'deepseek';
+
+      const currentTheme = localStorage.getItem('prompt_enhancer_theme') || 'dark';
+      themeSelect.value = currentTheme;
+
+      showProfileBarCheck.checked = localStorage.getItem('prompt_enhancer_show_profile_bar') !== 'false';
+      customProjectAliasInput.value = localStorage.getItem('prompt_enhancer_project_alias') || '';
+      textOnlyModeCheck.checked = localStorage.getItem('prompt_enhancer_text_only') === 'true';
+    }
+
+    modelPresetSelect.addEventListener('change', () => {
+      const p = modelPresetSelect.value;
+      if (PRESETS[p]) {
+        configEndpointInput.value = PRESETS[p].endpoint;
+        configModelNameInput.value = PRESETS[p].model;
+      }
+    });
+
+    themeSelect.addEventListener('change', () => {
+      applyTheme(themeSelect.value);
+    });
+
+    textOnlyModeCheck.addEventListener('change', () => {
+      applyTextOnlyMode(textOnlyModeCheck.checked);
+    });
+
+    openModelConfigBtn.addEventListener('click', () => {
+      syncSettingsInputs();
+      modelConfigModal.classList.add('open');
+    });
+
+    closeModelConfigModalBtn.addEventListener('click', () => {
+      modelConfigModal.classList.remove('open');
+    });
+
+    saveModelConfigBtn.addEventListener('click', () => {
+      const cfg = {
+        preset: modelPresetSelect.value,
+        endpoint: configEndpointInput.value.trim(),
+        apiKey: configApiKeyInput.value.trim(),
+        model: configModelNameInput.value.trim()
+      };
+      localStorage.setItem('prompt_enhancer_model_config', JSON.stringify(cfg));
+      localStorage.setItem('prompt_enhancer_show_profile_bar', showProfileBarCheck.checked ? 'true' : 'false');
+      localStorage.setItem('prompt_enhancer_project_alias', customProjectAliasInput.value.trim());
+
+      applyTheme(themeSelect.value);
+      applyTextOnlyMode(textOnlyModeCheck.checked);
+      refreshProjectProfile();
+
+      modelConfigModal.classList.remove('open');
+      showToast('设置已保存并生效');
+    });
+
+    // 初始化加载
+    applyTheme(localStorage.getItem('prompt_enhancer_theme') || 'dark');
+    applyTextOnlyMode(localStorage.getItem('prompt_enhancer_text_only') === 'true');
+    updatePinState();
+    updateDockState();
+    refreshProjectProfile();
+  </script>
+</body>
+</html>

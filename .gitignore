@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Temporary files & local state
+.last_project_dir
+.temp_clip.txt
+.clip_tmp.txt
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build artifacts
+dist/PromptEnhancer
+dist/*.app
+dist/*.zip
