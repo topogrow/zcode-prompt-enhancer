@@ -13,6 +13,14 @@
 
 ---
 
+## ⚡ 给 AI 助手 (ZCode / Cursor) 的一键安装指令
+
+如果你正在使用支持终端工具的 AI 编程助手（如 **ZCode**），无需手动敲命令，直接将下面这句话复制发给你的 AI 即可全自动拉取代码、构建安装并启动：
+
+> **`请帮我克隆 https://github.com/topogrow/zcode-prompt-enhancer.git 并执行 ./install.sh 完成安装、启动并打开 GitHub`**
+
+---
+
 ## 🌟 核心特性 (Features)
 
 ### 1. 🎯 100% 工业级 Prompt 工程学规范（对齐 WorkBuddy）
