@@ -89,6 +89,14 @@ class ScriptBridge: NSObject, WKScriptMessageHandler {
             }
         }
         
+        // 原生系统剪贴板直通通道 (零权限弹窗、原生 NSPasteboard 瞬间写入)
+        if message.name == "copyToClipboard" {
+            if let text = message.body as? String {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+        }
+        
         if message.name == "closeWindow" {
             panel.orderOut(nil)
         }
@@ -157,6 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         contentController.add(bridge!, name: "startWindowDrag")
         contentController.add(bridge!, name: "setAlwaysOnTop")
         contentController.add(bridge!, name: "setDockMode")
+        contentController.add(bridge!, name: "copyToClipboard")
         contentController.add(bridge!, name: "closeWindow")
         contentController.add(bridge!, name: "miniaturizeWindow")
         contentController.add(bridge!, name: "zoomWindow")
@@ -298,7 +307,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: nodePath)
-        proc.arguments = [bundledServer]
+        proc.arguments = [bundledServer, "--parent-pid", String(ProcessInfo.processInfo.processIdentifier)]
         try? proc.run()
         serverProcess = proc
     }

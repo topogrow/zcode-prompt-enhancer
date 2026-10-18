@@ -1322,22 +1322,59 @@
       showToast('已追加 ZCode 建议至提示词末尾！');
     }
 
+    // 三重稳健剪贴板写入策略 (原生 NSPasteboard -> Clipboard API -> execCommand 兜底)
+    function copyTextToClipboard(text) {
+      if (!text) return false;
+
+      // 1. 优先调用 Swift 原生 NSPasteboard (零权限弹窗、瞬间写入系统剪贴板)
+      try {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.copyToClipboard) {
+          window.webkit.messageHandlers.copyToClipboard.postMessage(text);
+          return true;
+        }
+      } catch (e) {}
+
+      // 2. 尝试现代异步 Clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {
+          fallbackExecCommandCopy(text);
+        });
+        return true;
+      }
+
+      // 3. 经典 execCommand 终极兜底
+      return fallbackExecCommandCopy(text);
+    }
+
+    function fallbackExecCommandCopy(text) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return success;
+      } catch (err) {
+        return false;
+      }
+    }
+
     async function copyAdviceOnly() {
       if (!state.currentAdvice || !state.currentAdvice.directive) return;
-      await navigator.clipboard.writeText(state.currentAdvice.directive);
-      showToast('已复制 ZCode 建议指令！');
+      copyTextToClipboard(state.currentAdvice.directive);
+      showToast('已复制建议指令到剪贴板！');
     }
 
     async function handleCopy() {
       const text = promptInput.value.trim();
       if (!text) return;
-      await navigator.clipboard.writeText(text);
-      showToast('已复制到剪贴板！');
-      fetch('/api/paste-to-active-app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      }).catch(() => {});
+      copyTextToClipboard(text);
+      showToast('已复制提示词到剪贴板！');
     }
 
     // 刷新项目画像 (已过滤 Unknown 噪音，并支持开关与别名)

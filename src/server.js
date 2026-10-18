@@ -81,16 +81,23 @@ function parseJsonBody(req, limit = MAX_PAYLOAD_BYTES) {
 
 // P1 进程守护: 父进程存活心跳监测 (防止宿主意外崩溃造成孤儿进程占死端口)
 function startParentHeartbeat() {
-  const ppid = process.ppid;
-  if (!ppid || ppid <= 1) return;
+  // 优先取显式指定的父进程 PID
+  const parentArgIdx = process.argv.indexOf('--parent-pid');
+  const targetPid = parentArgIdx !== -1 && process.argv[parentArgIdx + 1]
+    ? parseInt(process.argv[parentArgIdx + 1], 10)
+    : process.ppid;
+
+  if (!targetPid || targetPid <= 1) return;
 
   const timer = setInterval(() => {
     try {
-      // kill -0 探测进程是否存在
-      process.kill(ppid, 0);
-    } catch {
-      console.log(`[Server] 父进程 (PID: ${ppid}) 已终止，Node 守护服务自退出释放端口。`);
-      process.exit(0);
+      process.kill(targetPid, 0);
+    } catch (e) {
+      // 只有在明确报 ESRCH (No such process) 时才判定父进程死亡
+      if (e.code === 'ESRCH') {
+        console.log(`[Server] 宿主进程 (PID: ${targetPid}) 已终止，Node 守护服务自退出释放端口。`);
+        process.exit(0);
+      }
     }
   }, 3000);
   timer.unref();
