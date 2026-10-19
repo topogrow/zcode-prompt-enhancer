@@ -17,9 +17,9 @@ class MainWindow: NSWindow {
         self.titleVisibility = .hidden
         self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = false
-        self.isOpaque = false
-        // 关键修复：设置深色背景，杜绝因网页异步加载而造成窗口透明隐形
-        self.backgroundColor = NSColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 0.96)
+        // 关键修复 1：设为实体不透明 (isOpaque = true)，WindowServer 即可通过显卡硬件直通等比捕获完整纹理，彻底杜绝 Alpha 采样畸变
+        self.isOpaque = true
+        self.backgroundColor = NSColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 1.0)
         self.hasShadow = true
         
         self.minSize = NSSize(width: 260, height: 280)
@@ -27,6 +27,15 @@ class MainWindow: NSWindow {
         self.standardWindowButton(.closeButton)?.isHidden = true
         self.standardWindowButton(.miniaturizeButton)?.isHidden = true
         self.standardWindowButton(.zoomButton)?.isHidden = true
+    }
+    
+    // 关键修复 2：重写 contentRect / frameRect，明确告知调度中心 (Mission Control) 视觉内容 100% 充满 Frame，消除 28pt 标题栏扣减导致的纵向压扁
+    override func contentRect(forFrameRect frameRect: NSRect) -> NSRect {
+        return frameRect
+    }
+    
+    override func frameRect(forContentRect contentRect: NSRect) -> NSRect {
+        return contentRect
     }
     
     override var canBecomeKey: Bool {
@@ -171,11 +180,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         contentController.add(bridge!, name: "zoomWindow")
         contentController.add(bridge!, name: "activateApp")
         
+        // 关键修复 3：统一全窗口 Layer Backing 体系，锁定单一渲染根树
+        panel?.contentView?.wantsLayer = true
+        panel?.contentView?.layerContentsRedrawPolicy = .onSetNeedsDisplay
+        
         let config = WKWebViewConfiguration()
         config.userContentController = contentController
         
         webView = WKWebView(frame: panel!.contentView!.bounds, configuration: config)
         webView?.navigationDelegate = self
+        webView?.wantsLayer = true
         webView?.autoresizingMask = [.width, .height]
         webView?.setValue(false, forKey: "drawsBackground")
         
@@ -323,6 +337,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         } else {
             stopDockTracking()
             panel.setFrame(normalFrame, display: true, animate: true)
+            panel.invalidateShadow()
         }
     }
     
