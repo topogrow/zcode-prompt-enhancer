@@ -328,15 +328,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     
     func toggleDockMode(docked: Bool) {
         guard let panel = panel else { return }
+        if isDocked == docked { return }
         isDocked = docked
         
         if docked {
-            normalFrame = panel.frame
+            // 仅在当前处于普通卡片形态时记录原始几何尺寸，避免被侧栏尺寸污染
+            if panel.frame.width >= 360 {
+                normalFrame = panel.frame
+            }
             updateDockPosition(animated: true)
             startDockTracking()
         } else {
             stopDockTracking()
-            panel.setFrame(normalFrame, display: true, animate: true)
+            let restoreFrame: NSRect
+            if normalFrame.width < 360 {
+                let screenRect = (panel.screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+                restoreFrame = NSRect(x: screenRect.maxX - 520 - 30, y: screenRect.maxY - 440 - 40, width: 520, height: 440)
+            } else {
+                restoreFrame = normalFrame
+            }
+            panel.setFrame(restoreFrame, display: true, animate: true)
             panel.invalidateShadow()
         }
     }
@@ -388,15 +399,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         updateDockPosition(animated: false)
     }
     
-    // 优化吸附几何计算：保持 380x480 黄金比例助手卡片，对齐在目标窗口右上角，彻底杜绝 942px 暴力拉伸电线杆
+    // 恢复 340px 纵向长条形侧栏形态，高度贴合对齐目标窗口（ZCode / Cursor / VS Code）
     private func updateDockPosition(animated: Bool) {
         guard let panel = panel, isDocked else { return }
         let currentScreen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
         let screenRect = currentScreen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        
-        // 采用舒适自然的伴侣卡片尺寸 (宽 380，高 480)，避免在桌面调度中心变成细长怪胎
-        let dockWidth: CGFloat = 380
-        let dockHeight: CGFloat = 480
+        let dockWidth: CGFloat = 340
         
         let targetFrame: NSRect
         if let zcode = getZCodeWindowFrame() {
@@ -404,14 +412,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             if targetX + dockWidth > screenRect.maxX {
                 targetX = screenRect.maxX - dockWidth
             }
-            // 贴合对齐在 ZCode 窗口的右上边缘
-            let targetY = max(screenRect.minY, min(screenRect.maxY - dockHeight, zcode.maxY - dockHeight))
-            targetFrame = NSRect(x: targetX, y: targetY, width: dockWidth, height: dockHeight)
+            // 贴合对齐 ZCode 的可视纵向高度，同时严格限制在当前屏幕工作区内
+            let topY = min(screenRect.maxY, zcode.maxY)
+            let bottomY = max(screenRect.minY, zcode.minY)
+            let targetHeight = max(280.0, min(screenRect.height, topY - bottomY))
+            let targetY = max(screenRect.minY, topY - targetHeight)
+            targetFrame = NSRect(x: targetX, y: targetY, width: dockWidth, height: targetHeight)
         } else {
-            // 未检测到 ZCode 时贴附在屏幕右上角
-            let targetX = screenRect.maxX - dockWidth
-            let targetY = screenRect.maxY - dockHeight - 20
-            targetFrame = NSRect(x: targetX, y: targetY, width: dockWidth, height: dockHeight)
+            // 未检测到 ZCode 时贴附在屏幕右侧整列
+            targetFrame = NSRect(x: screenRect.maxX - dockWidth, y: screenRect.minY, width: dockWidth, height: screenRect.height)
         }
         
         let cur = panel.frame

@@ -282,6 +282,7 @@
       padding: 10px 12px;
       gap: 8px;
       overflow-y: auto;
+      min-height: 0;
     }
 
     .textarea-box {
@@ -290,7 +291,6 @@
       display: flex;
       flex-direction: column;
       min-height: 80px;
-      max-height: 290px;
     }
 
     textarea {
@@ -307,7 +307,6 @@
       outline: none;
       transition: all 0.2s ease;
       min-height: 100px;
-      max-height: 260px;
     }
 
     textarea:focus {
@@ -738,44 +737,91 @@
     }
 
     /* ============================================================
-       3. 弹性自适应响应式排版 (@media 查询优化，放宽至 260px)
+       3. 弹性自适应响应式排版 (针对长条形侧栏 340px 及更窄尺寸深度重构)
        ============================================================ */
     @media (max-width: 440px) {
       .brand span {
         display: none;
       }
       .project-selector {
-        max-width: 110px;
+        max-width: 100px;
       }
     }
 
-    @media (max-width: 360px) {
+    @media (max-width: 380px) {
       .header {
         padding: 6px 8px;
         gap: 4px;
       }
-      .zcode-btn span {
+      .traffic-lights {
+        margin-right: 4px;
+        gap: 6px;
+      }
+      .brand {
+        margin-right: auto;
+      }
+      .brand span {
         display: none;
       }
+      .header-actions {
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .zcode-btn {
+        padding: 4px 6px;
+      }
+      .zcode-btn span {
+        display: none; /* 紧凑长条形下隐藏文字，保留闪电图标 */
+      }
       .project-selector {
-        max-width: 75px;
-        padding: 3px 5px;
+        max-width: 80px;
+        padding: 3px 6px;
+        font-size: 10px;
       }
-      textarea {
-        min-height: 70px;
+      .btn-icon {
+        padding: 4px 6px;
       }
+
+      /* 底部操作栏分层弹性重排：确保所有按钮 100% 完整露出来且热区舒适 */
       .shortcut-hint {
         display: none;
       }
+      .footer {
+        padding: 8px 10px;
+      }
       .button-group {
         width: 100%;
-        justify-content: flex-end;
-        gap: 4px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
       }
-      .btn {
-        padding: 4px 8px;
+      .button-group .btn {
+        flex: 1 1 calc(50% - 4px);
+        padding: 7px 8px;
         font-size: 11px;
+        justify-content: center;
+        min-width: 0;
       }
+      /* 建议切换按钮居于顶部通栏 */
+      .button-group #zcodeAdviceToggleBtn {
+        flex: 1 1 100%;
+        order: 1;
+      }
+      /* 恢复与复制并排对齐 */
+      .button-group #revertBtn {
+        order: 2;
+      }
+      .button-group #copyBtn {
+        order: 2;
+      }
+      /* 核心主增强按钮置于最显眼处并全宽 */
+      .button-group #enhanceBtn {
+        flex: 1 1 100%;
+        order: 3;
+        padding: 9px 10px;
+        font-size: 12px;
+      }
+
       .advice-actions {
         width: 100%;
         justify-content: flex-end;
@@ -813,21 +859,6 @@
       }
       .box-footer {
         justify-content: flex-end;
-      }
-      .button-group {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 3px;
-        width: 100%;
-      }
-      .button-group .btn {
-        width: 100%;
-        padding: 4px 2px;
-        font-size: 10px;
-        justify-content: center;
-      }
-      .button-group #enhanceBtn {
-        grid-column: span 2;
       }
     }
   </style>
