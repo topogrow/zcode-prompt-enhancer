@@ -17,9 +17,9 @@ class MainWindow: NSWindow {
         self.titleVisibility = .hidden
         self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = false
-        // 关键修复 1：设为实体不透明 (isOpaque = true)，WindowServer 即可通过显卡硬件直通等比捕获完整纹理，彻底杜绝 Alpha 采样畸变
-        self.isOpaque = true
-        self.backgroundColor = NSColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 1.0)
+        // 恢复原生通透高级质感与自适应毛玻璃通道
+        self.isOpaque = false
+        self.backgroundColor = .clear
         self.hasShadow = true
         
         self.minSize = NSSize(width: 260, height: 280)
