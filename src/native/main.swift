@@ -388,11 +388,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         updateDockPosition(animated: false)
     }
     
+    // 优化吸附几何计算：保持 380x480 黄金比例助手卡片，对齐在目标窗口右上角，彻底杜绝 942px 暴力拉伸电线杆
     private func updateDockPosition(animated: Bool) {
         guard let panel = panel, isDocked else { return }
         let currentScreen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
         let screenRect = currentScreen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let dockWidth: CGFloat = 340
+        
+        // 采用舒适自然的伴侣卡片尺寸 (宽 380，高 480)，避免在桌面调度中心变成细长怪胎
+        let dockWidth: CGFloat = 380
+        let dockHeight: CGFloat = 480
         
         let targetFrame: NSRect
         if let zcode = getZCodeWindowFrame() {
@@ -400,11 +404,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             if targetX + dockWidth > screenRect.maxX {
                 targetX = screenRect.maxX - dockWidth
             }
-            let targetY = max(screenRect.minY, zcode.minY)
-            let targetHeight = min(screenRect.height, zcode.height)
-            targetFrame = NSRect(x: targetX, y: targetY, width: dockWidth, height: targetHeight)
+            // 贴合对齐在 ZCode 窗口的右上边缘
+            let targetY = max(screenRect.minY, min(screenRect.maxY - dockHeight, zcode.maxY - dockHeight))
+            targetFrame = NSRect(x: targetX, y: targetY, width: dockWidth, height: dockHeight)
         } else {
-            targetFrame = NSRect(x: screenRect.maxX - dockWidth, y: screenRect.minY, width: dockWidth, height: screenRect.height)
+            // 未检测到 ZCode 时贴附在屏幕右上角
+            let targetX = screenRect.maxX - dockWidth
+            let targetY = screenRect.maxY - dockHeight - 20
+            targetFrame = NSRect(x: targetX, y: targetY, width: dockWidth, height: dockHeight)
         }
         
         let cur = panel.frame
