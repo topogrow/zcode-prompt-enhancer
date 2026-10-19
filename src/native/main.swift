@@ -29,15 +29,6 @@ class MainWindow: NSWindow {
         self.standardWindowButton(.zoomButton)?.isHidden = true
     }
     
-    // 关键修复 2：重写 contentRect / frameRect，明确告知调度中心 (Mission Control) 视觉内容 100% 充满 Frame，消除 28pt 标题栏扣减导致的纵向压扁
-    override func contentRect(forFrameRect frameRect: NSRect) -> NSRect {
-        return frameRect
-    }
-    
-    override func frameRect(forContentRect contentRect: NSRect) -> NSRect {
-        return contentRect
-    }
-    
     override var canBecomeKey: Bool {
         return true
     }
@@ -180,16 +171,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         contentController.add(bridge!, name: "zoomWindow")
         contentController.add(bridge!, name: "activateApp")
         
-        // 关键修复 3：统一全窗口 Layer Backing 体系，锁定单一渲染根树
-        panel?.contentView?.wantsLayer = true
-        panel?.contentView?.layerContentsRedrawPolicy = .onSetNeedsDisplay
-        
         let config = WKWebViewConfiguration()
         config.userContentController = contentController
         
         webView = WKWebView(frame: panel!.contentView!.bounds, configuration: config)
         webView?.navigationDelegate = self
-        webView?.wantsLayer = true
         webView?.autoresizingMask = [.width, .height]
         webView?.setValue(false, forKey: "drawsBackground")
         
