@@ -1086,6 +1086,14 @@
             <input type="text" id="configEndpointInput" placeholder="API 端点 (如: https://api.deepseek.com)">
             <input type="password" id="configApiKeyInput" placeholder="API Key (本地 Ollama 可留空)">
             <input type="text" id="configModelNameInput" placeholder="模型名 (如: deepseek-chat)">
+
+            <label style="font-size: 11px; font-weight: 600; color: var(--zcode-color); margin-top: 2px;">请求超时限制:</label>
+            <select id="configTimeoutSelect" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; color: var(--text-main); font-size: 11px; outline: none;">
+              <option value="45">45 秒 (默认推荐: 兼顾冷启动与排队)</option>
+              <option value="60">60 秒 (宽裕模式: 复杂模型防超时)</option>
+              <option value="90">90 秒 (超长等待: 适合本地大参数模型)</option>
+              <option value="30">30 秒 (快速模式: 适合云端高速 API)</option>
+            </select>
           </div>
 
           <button class="btn btn-enhance" id="saveModelConfigBtn" style="margin-top: 6px; justify-content: center;">
@@ -1148,6 +1156,7 @@
     const configEndpointInput = document.getElementById('configEndpointInput');
     const configApiKeyInput = document.getElementById('configApiKeyInput');
     const configModelNameInput = document.getElementById('configModelNameInput');
+    const configTimeoutSelect = document.getElementById('configTimeoutSelect');
     const saveModelConfigBtn = document.getElementById('saveModelConfigBtn');
 
     // 矢量图标模板
@@ -1237,8 +1246,20 @@
       state.abortController = new AbortController();
       updateUIState();
 
+      // 动态耗时计时器：让用户清晰感知推理状态，消除网络悬停焦虑
+      let elapsedSeconds = 0;
+      const timerInterval = setInterval(() => {
+        if (!state.isEnhancing) {
+          clearInterval(timerInterval);
+          return;
+        }
+        elapsedSeconds += 1;
+        statusHint.textContent = `⏳ 正在由 Prompt 架构专家智能优化中 (已耗时 ${elapsedSeconds}s)... 点击可取消`;
+      }, 1000);
+
       try {
         const modelConfig = getModelConfig();
+        const timeoutSeconds = parseInt(modelConfig.timeoutSeconds, 10) || 45;
         const res = await fetch('/api/enhance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1247,7 +1268,8 @@
             projectDir: state.currentProjectDir || null,
             endpoint: modelConfig.endpoint || void 0,
             apiKey: modelConfig.apiKey || void 0,
-            model: modelConfig.model || void 0
+            model: modelConfig.model || void 0,
+            timeoutMs: timeoutSeconds * 1000
           }),
           signal: state.abortController.signal
         });
@@ -1783,6 +1805,7 @@
       configEndpointInput.value = cfg.endpoint || '';
       configApiKeyInput.value = cfg.apiKey || '';
       configModelNameInput.value = cfg.model || '';
+      configTimeoutSelect.value = String(cfg.timeoutSeconds || '45');
       modelPresetSelect.value = cfg.preset || 'deepseek';
 
       const currentTheme = localStorage.getItem('prompt_enhancer_theme') || 'dark';
@@ -1823,7 +1846,8 @@
         preset: modelPresetSelect.value,
         endpoint: configEndpointInput.value.trim(),
         apiKey: configApiKeyInput.value.trim(),
-        model: configModelNameInput.value.trim()
+        model: configModelNameInput.value.trim(),
+        timeoutSeconds: parseInt(configTimeoutSelect.value, 10) || 45
       };
       localStorage.setItem('prompt_enhancer_model_config', JSON.stringify(cfg));
       localStorage.setItem('prompt_enhancer_show_profile_bar', showProfileBarCheck.checked ? 'true' : 'false');

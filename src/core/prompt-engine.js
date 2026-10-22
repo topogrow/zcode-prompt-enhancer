@@ -182,8 +182,8 @@ export class PromptEngine {
           stream: false,
         };
 
-    // 15 秒超时熔断控制 (避免网络波动或端点失效导致界面永久悬停在 Loading 态)
-    const timeoutMs = options.timeoutMs || 15000;
+    // 超时熔断控制 (默认放宽至 45 秒，兼顾本地 Ollama 冷启动加载与云端 API 高峰期排队)
+    const timeoutMs = options.timeoutMs || 45000;
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(() => {
       timeoutController.abort(new Error(`大模型服务在 ${timeoutMs / 1000} 秒内未响应，已自动熔断。请检查网络、端点地址或 API Key 是否正确。`));

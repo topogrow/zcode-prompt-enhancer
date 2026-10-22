@@ -140,7 +140,7 @@ const server = http.createServer(async (req, res) => {
   // API 1: 提示词增强 (/api/enhance)
   if (pathname === '/api/enhance' && req.method === 'POST') {
     try {
-      const { text, projectDir, model, endpoint, apiKey } = await parseJsonBody(req);
+      const { text, projectDir, model, endpoint, apiKey, timeoutMs } = await parseJsonBody(req);
       if (!text || !text.trim()) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Text cannot be empty' }));
@@ -153,6 +153,7 @@ const server = http.createServer(async (req, res) => {
         model,
         endpoint,
         apiKey,
+        timeoutMs,
       });
 
       // 生成针对当前润色结果与工程环境的 ZCode 能力建议
